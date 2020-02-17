@@ -3,6 +3,7 @@
 #include "FS.h"
 #include "SD.h"
 #include <SPI.h>
+#include <string.h>
 
 // Libraries to get time from NTP Server
 #include <WiFi.h>
@@ -10,8 +11,8 @@
 #include <WiFiUdp.h>
 
 // Replace with your network credentials
-const char* ssid     = "Thurdin";
-const char* password = "Rustle100";
+const char* ssid     = "Welcome to Humber";//"SM-G920W80460";
+const char* password = "";
 
 // Define CS pin for the SD card module
 #define SD_CS 5
@@ -29,6 +30,7 @@ NTPClient timeClient(ntpUDP);
 String formattedDate;
 String dayStamp;
 String timeStamp;
+char FileName[]="/data2.txt";
 
 void setup() {
   // initialize digital pin LED_BUILTIN as an output.
@@ -74,11 +76,11 @@ void setup() {
   
   // If the data.txt file doesn't exist
   // Create a file on the SD card and write the data labels
-  File file = SD.open("/data.txt");
+  File file = SD.open(FileName);
   if(!file) {
     Serial.println("File doens't exist");
     Serial.println("Creating file...");
-    writeFile(SD, "/data.txt", "Reading ID, Date, Hour, Temperature \r\n");
+    writeFile(SD, FileName, "Reading ID, Date, Hour, Temperature \r\n");
   }
   else {
     Serial.println("File already exists");  
@@ -119,7 +121,7 @@ void getTimeStamp() {
   dayStamp = formattedDate.substring(0, splitT);
   Serial.println(dayStamp);
   // Extract time
-  timeStamp = formattedDate.substring(splitT+1, formattedDate.length()-1);
+  timeStamp = formattedDate.substring(splitT, formattedDate.length()-1);
   Serial.println(timeStamp);
 }
 
@@ -129,7 +131,7 @@ void logSDCard(int sensorValue) {
                 String(sensorValue) + "\r\n";
   Serial.print("Save data: ");
   Serial.println(dataMessage);
-  appendFile(SD, "/data.txt", dataMessage.c_str());
+  appendFile(SD, FileName, dataMessage.c_str());
 }
 
 // Write to the SD card (DON'T MODIFY THIS FUNCTION)
