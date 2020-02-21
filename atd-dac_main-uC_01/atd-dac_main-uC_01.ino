@@ -11,8 +11,8 @@
 #include <WiFiUdp.h>
 
 // Replace with your network credentials
-const char* ssid     = "Welcome to Humber";//"SM-G920W80460";
-const char* password = "";
+const char* ssid     = "Thurdin";//"SM-G920W80460";
+const char* password = "Rustle100";
 
 // Define CS pin for the SD card module
 #define SD_CS 5
