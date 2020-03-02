@@ -164,12 +164,12 @@ void loop() {
     
     while(sessionSensor)
     {
-      pressureSensor = map(analogRead(PRESS_SENSE), 618, 5525, 0, 1640);
+      pressureSensor = map(analogRead(PRESS_SENSE), 390, 3962, 0, 1200);
         if (pressureSensor < 0)
         {
           pressureSensor = 0;
         }
-      Serial.println(pressureSensor);
+      Serial.println(double(pressureSensor)/100);
       logSDCard(pressureSensor);
       delay(1500);
       sessionSensor=digitalRead(SESS_SENSE);
@@ -247,9 +247,9 @@ void createFileName(int fileNum)
   FileNameStr += "-";
   FileNameStr += now.day();
   FileNameStr += "_ATD_DATA_";
-  if(fileNum>100)
+  if(fileNum>=100)
     FileNameStr += fileNum;
-  else if (fileNum>10)
+  else if (fileNum>=10)
   {
     FileNameStr += "0";
     FileNameStr += fileNum;
@@ -270,7 +270,7 @@ void createFileName(int fileNum)
 // Write the sensor readings on the SD card
 void logSDCard(int sensorValue) {
   DateTime now = rtc.now();
-  dataMessage = String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()) +"," + String(sensorValue) + "," + "65" + "," + 
+  dataMessage = String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()) +"," + String(double(pressureSensor)/100) + "," + "65" + "," + 
                 "50" + "," + "90" + "," + "30" + "," + "50" + "," + "25" + "," + "30" + "\r\n";
 
   appendFile(SD, FileName, dataMessage.c_str());

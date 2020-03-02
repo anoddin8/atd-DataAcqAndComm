@@ -1,25 +1,34 @@
 // Libraries for SD card
-#include "FS.h"
+//#include "FS.h"
 #include "SD.h"
 #include <SPI.h>
-#include <string.h>
+
+//Additional libraries
 #include <string>
 #include <iostream>
 
+//BLE library
 #include "BLEDevice.h"
 
 // Library for Clock Module
 #include<RTClib.h>
 
 
-// Libraries to get time from NTP Server
+// Libraries to get time from NTP Server, and WiFi 
 #include <WiFi.h>
 #include <NTPClient.h>
-#include <WiFiUdp.h>
+//#include <WiFiUdp.h>
 
-// Replace with your network credentials
-//const char* ssid     = "Welcome to Humber";//"SM-G920W80460";
-//const char* password = "";
+
+//Function Prototypes
+bool connectToServer(); //BLE
+void getTimeStamp(); //RTC module
+void printDateTime();//Print Date And time
+void createFileName(int fileNum); //Create unique filename
+void logSDCard(int sensorValue); //log values to sd card
+void writeFile(fs::FS &fs, const char * path, const char * message) ; //write file
+void appendFile(fs::FS &fs, const char * path, const char * message); //append file
+
 
 // Define CS pin for the SD card module
 #define SD_CS 5
@@ -61,22 +70,25 @@ NTPClient timeClient(ntpUDP);
 #define SD_CS 5
 
 // Variables to save date and time
-String formattedDate;
-String YearStamp,MonthStamp, DayStamp;
-String timeStamp;
+//String formattedDate;
+//String YearStamp,MonthStamp, DayStamp;
+//String timeStamp;
 char FileName[35];
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
 
 // WiFi Variables 
-const char* ssid ="Thurdin";
-const char* password="Rustle100";
+//const char* ssid ="Thurdin";
+//const char* password="Rustle100";
+const char* ssid ="SM-G920W80460";
+const char* password="prts3279";
 bool connWifi=false;
 
 //Pressure Variables
-int pressureSensor;
-int sessionSensor=0;
+int16_t pressureSensor;
+bool sessionSensor=true;
 
+//BLE callback fumction
 static void notifyCallback(
   BLERemoteCharacteristic* pBLERemoteCharacteristic,
   uint8_t* pData,
@@ -89,7 +101,7 @@ static void notifyCallback(
     Serial.println(length);
     Serial.print("data: ");
     Serial.println((char*)pData);
-}
+  }
 
 class MyClientCallback : public BLEClientCallbacks 
 {
@@ -102,67 +114,18 @@ class MyClientCallback : public BLEClientCallbacks
   }
 };
 
-bool connectToServer() 
-{
-    Serial.print("Forming a connection to ");
-    Serial.println(myDevice->getAddress().toString().c_str());
-    
-    BLEClient*  pClient  = BLEDevice::createClient();
-    Serial.println(" - Created client");
 
-    pClient->setClientCallbacks(new MyClientCallback());
-
-    // Connect to the remove BLE Server.
-    pClient->connect(myDevice);  // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
-    Serial.println(" - Connected to server");
-
-    // Obtain a reference to the service we are after in the remote BLE server.
-    BLERemoteService* pRemoteService = pClient->getService(serviceUUID);
-    if (pRemoteService == nullptr) {
-      Serial.print("Failed to find our service UUID: ");
-      Serial.println(serviceUUID.toString().c_str());
-      pClient->disconnect();
-      return false;
-    }
-    Serial.println(" - Found our service");
-   // Obtain a reference to the characteristic in the service of the remote BLE server.
-    pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
-    if (pRemoteCharacteristic == nullptr) {
-      Serial.print("Failed to find our characteristic UUID: ");
-      Serial.println(charUUID.toString().c_str());
-      pClient->disconnect();
-      return false;
-    }
-    pRemoteCharacteristic2 = pRemoteService->getCharacteristic(charUUID2);
-    if (pRemoteCharacteristic == nullptr) {
-      Serial.print("Failed to find our characteristic UUID: ");
-      Serial.println(charUUID.toString().c_str());
-      pClient->disconnect();
-      return false;
-    }
-    Serial.println(" - Found our characteristic");
-
-    // Read the value of the characteristic.
-    if(pRemoteCharacteristic->canRead()) {
-      std::string value = pRemoteCharacteristic->readValue();
-      Serial.print("The characteristic value was: ");
-      Serial.println(value.c_str());
-    }
-
-    if(pRemoteCharacteristic->canNotify())
-      pRemoteCharacteristic->registerForNotify(notifyCallback);
-
-    connected = true;
-}
 
 /**
  * Scan for BLE servers and find the first one that advertises the service we are looking for.
  */
-class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
+class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks 
+{
  /**
    * Called for each advertising BLE server.
    */
-  void onResult(BLEAdvertisedDevice advertisedDevice) {
+  void onResult(BLEAdvertisedDevice advertisedDevice) 
+  {
     Serial.print("BLE Advertised Device found: ");
     Serial.println(advertisedDevice.toString().c_str());
 
@@ -202,7 +165,7 @@ void setup() {
   pBLEScan->setActiveScan(true);
   pBLEScan->start(5, false);
  // End of setup.
-   
+
   
   // Connect to Wi-Fi network with SSID and password
   Serial.print("Connecting to ");
@@ -236,6 +199,11 @@ void setup() {
     // GMT -1 = -3600
     // GMT 0 = 0
   timeClient.setTimeOffset(-18000); //Eastern Standard Time -18000
+  
+  if((WiFi.status() == WL_CONNECTED))
+    getTimeStamp();
+  else
+    Serial.println("No time update without Internet Connection.");
 
   // Initialize SD card
   SD.begin(SD_CS);  
@@ -245,19 +213,16 @@ void setup() {
   }
 
   uint8_t cardType = SD.cardType();
-  if(cardType == CARD_NONE) {
+  if(cardType == CARD_NONE) 
+  {
     Serial.println("No SD card attached");
   }
-    if (! rtc.begin()) {
+    if (! rtc.begin()) 
+    {
     Serial.println("Couldn't find RTC");
     while (1);
   }
-  if((WiFi.status() == WL_CONNECTED))
-    getTimeStamp();
-  else
-    Serial.println("No time update without Internet Connection.");
-  
-   
+ 
   printDateTime();
 
   
@@ -265,22 +230,28 @@ void setup() {
 
 void loop() 
 {
-  if (doConnect == true) {
-    if (connectToServer()) {
+  //connect to BLE server
+  if (doConnect == true) 
+  {
+    if (connectToServer()) 
+    {
       Serial.println("We are now connected to the BLE Server.");
     } else {
       Serial.println("We have failed to connect to the server; there is nothin more we will do.");
     }
     doConnect = false;
   }
+  //check session sensor
   sessionSensor=digitalRead(SESS_SENSE);
   if (sessionSensor)
     {
       delay(500);
       sessionSensor=digitalRead(SESS_SENSE);
     }
-  
-  if(sessionSensor){
+    
+  // Run when therapy session has started
+  if(sessionSensor)
+  {
     int fileNum=0;
     bool uniqueFileName=false;
     while(!uniqueFileName)
@@ -297,23 +268,26 @@ void loop()
       }
       file.close();
     }
+
     
     while(sessionSensor)
     {
-        if (connected) {
-      String newValue = "Time since boot: " + String(millis()/1000);
-      Serial.println("Setting new characteristic value to \"" + newValue + "\"");
+        if (connected) 
+        {
+          String newValue = "Time since boot: " + String(millis()/1000);
+          Serial.println("Setting new characteristic value to \"" + newValue + "\"");
+          
       
-      
-    }else if(doScan){
-      BLEDevice::getScan()->start(0);  // this is just eample to start scan after disconnect, most likely there is better way to do it in arduino
-    }
-      pressureSensor = map(analogRead(PRESS_SENSE), 618, 5525, 0, 1640);
+        }else if(doScan)
+        {
+          BLEDevice::getScan()->start(0);  // this is just eample to start scan after disconnect, most likely there is better way to do it in arduino
+        }
+      pressureSensor = map(analogRead(PRESS_SENSE), 390, 3962, 0, 1200);
         if (pressureSensor < 0)
         {
           pressureSensor = 0;
         }
-      Serial.println(pressureSensor);
+      Serial.println(double(pressureSensor)/100);
       logSDCard(pressureSensor);
       delay(1500);
       sessionSensor=digitalRead(SESS_SENSE);
@@ -325,31 +299,94 @@ void loop()
     }
   }
 }
+//BLE Function
+bool connectToServer() 
+{
+    Serial.print("Forming a connection to ");
+    Serial.println(myDevice->getAddress().toString().c_str());
+    
+    BLEClient*  pClient  = BLEDevice::createClient();
+    Serial.println(" - Created client");
+
+    pClient->setClientCallbacks(new MyClientCallback());
+
+    // Connect to the remove BLE Server.
+    pClient->connect(myDevice);  // if you pass BLEAdvertisedDevice instead of address, it will be recognized type of peer device address (public or private)
+    Serial.println(" - Connected to server");
+
+    // Obtain a reference to the service we are after in the remote BLE server.
+    BLERemoteService* pRemoteService = pClient->getService(serviceUUID);
+    if (pRemoteService == nullptr) 
+    {
+      Serial.print("Failed to find our service UUID: ");
+      Serial.println(serviceUUID.toString().c_str());
+      pClient->disconnect();
+      return false;
+    }
+    Serial.println(" - Found our service");
+   // Obtain a reference to the characteristic in the service of the remote BLE server.
+    pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
+    if (pRemoteCharacteristic == nullptr) 
+    {
+      Serial.print("Failed to find our characteristic UUID: ");
+      Serial.println(charUUID.toString().c_str());
+      pClient->disconnect();
+      return false;
+    }
+    pRemoteCharacteristic2 = pRemoteService->getCharacteristic(charUUID2);
+    if (pRemoteCharacteristic == nullptr) 
+    {
+      Serial.print("Failed to find our characteristic UUID: ");
+      Serial.println(charUUID.toString().c_str());
+      pClient->disconnect();
+      return false;
+    }
+    Serial.println(" - Found our characteristic");
+
+    // Read the value of the characteristic.
+    if(pRemoteCharacteristic->canRead()) 
+    {
+      std::string value = pRemoteCharacteristic->readValue();
+      Serial.print("The characteristic value was: ");
+      Serial.println(value.c_str());
+    }
+
+    if(pRemoteCharacteristic->canNotify())
+      pRemoteCharacteristic->registerForNotify(notifyCallback);
+
+    connected = true;
+    return connected;
+}
 //Get Time Stamp from internet and update RTC
 void getTimeStamp() 
 {
+  String formattedDate;
+  String YearStamp,MonthStamp, DayStamp;
+  String timeStamp;
+
   while(!timeClient.update()) 
   {
     timeClient.forceUpdate();
   }
   // The formattedDate comes with the following format:
   // 2018-05-28T16:00:13Z
-  // We need to extract date and time
+  // Extract Date and time:
   formattedDate = timeClient.getFormattedDate();
 
   // Extract date
   YearStamp = formattedDate.substring(0, 4);
   MonthStamp = formattedDate.substring(5, 7);
   DayStamp = formattedDate.substring(8, 10);
-
+  
+  //Convert Date info to char arrays 
   char yr[YearStamp.length()+1];
   char mth[MonthStamp.length()+1];
   char dy[DayStamp.length()+1];
-
   YearStamp.toCharArray(yr,YearStamp.length());
   MonthStamp.toCharArray(mth,MonthStamp.length());
   DayStamp.toCharArray(dy,DayStamp.length());
-  //char yr[4],mth[2],dy[2],hr[2],mn[2],sc[2];
+
+  //Convert Date and Time Variables to Required type for RTC
   uint16_t Iyr;
   uint8_t Imth,Idy,Ihr,Imn,Isc;
   Iyr=(uint16_t)YearStamp.toInt();
@@ -391,9 +428,9 @@ void createFileName(int fileNum)
   FileNameStr += "-";
   FileNameStr += now.day();
   FileNameStr += "_ATD_DATA_";
-  if(fileNum>100)
+  if(fileNum>=100)
     FileNameStr += fileNum;
-  else if (fileNum>10)
+  else if (fileNum>=10)
   {
     FileNameStr += "0";
     FileNameStr += fileNum;
@@ -412,15 +449,16 @@ void createFileName(int fileNum)
 }
 
 // Write the sensor readings on the SD card
-void logSDCard(int sensorValue) {
+void logSDCard(int sensorValue) 
+{
   // Set the characteristic's value to be the array of bytes that is actually a string.
       std::string IMU1x=pRemoteCharacteristic->readValue();
       std::string IMU2x=pRemoteCharacteristic2->readValue();
       Serial.println(IMU1x.c_str());
       Serial.println(IMU2x.c_str());
   DateTime now = rtc.now();
-  dataMessage = String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()) +"," + String(sensorValue) + "," + "65" + "," + 
-                IMU1x.c_str() + "," + "90" + "," + "30" + "," + IMU2x.c_str() + "," + "25" + "," + "30" + "\r\n";
+  dataMessage = String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()) +"," + String(double(sensorValue)/100) + "," + "65" + "," + 
+                "150"/*IMU1x.c_str()*/ + "," + "90" + "," + "30" + "," + "150"/*IMU2x.c_str()*/ + "," + "25" + "," + "30" + "\r\n";
 
   appendFile(SD, FileName, dataMessage.c_str());
 }
@@ -444,7 +482,8 @@ void writeFile(fs::FS &fs, const char * path, const char * message)
 }
 
 // Append data to the SD card (DON'T MODIFY THIS FUNCTION)
-void appendFile(fs::FS &fs, const char * path, const char * message) {
+void appendFile(fs::FS &fs, const char * path, const char * message) 
+{
   //Serial.printf("Appending to file: %s\n", path);
 
   File file = fs.open(path, FILE_APPEND);
