@@ -29,8 +29,7 @@ LSM9DS1 imu2;
 #define SDA_PIN 21    //ESP32 pin allocations for SDA/SCL
 #define SCL_PIN 22
 
-uint8_t val01=25;
-uint8_t val02=30;
+
 
 
 #define PRINT_CALCULATED
@@ -176,6 +175,8 @@ void loop()
   }
   if ((lastPrint + PRINT_SPEED) < millis())
   {
+    unsigned char val01[2];
+    unsigned char val02[2];
     // Print the heading and orientation for fun!
     // Call print attitude. The LSM9DS1's mag x and y
     // axes are opposite to the accelerometer, so my, mx are
@@ -185,34 +186,32 @@ void loop()
     IMU1_Value=printAttitude(imu1.ax, imu1.ay, imu1.az, -imu1.my, -imu1.mx, imu1.mz);
     if(IMU1_Value>=0)
     {
-      val01=0;
-      val02=IMU1_Value;
+      val01[0]=0;//Positive Value
+      val01[1]=IMU1_Value;
     }
     else
     {
-      val01=1;
-      val02=abs(IMU1_Value);
+      val01[0]=1;//negative Value
+      val01[1]=abs(IMU1_Value);
     }
-    customCharacteristic1.setValue(&val01,2);
-    customCharacteristic1.setValue(&val02,2);
+    customCharacteristic1.setValue(val01,2);
     Serial.println();
     Serial.println("IMU2");
     IMU2_Value=printAttitude(imu2.ax, imu2.ay, imu2.az, -imu2.my, -imu2.mx, imu2.mz);
     if(IMU2_Value>=0)
     {
-      val01=0;
-      val02=IMU2_Value;
+      val02[0]=0;
+      val02[1]=IMU2_Value;
     }
     else
     {
-      val01=1;
-      val02=abs(IMU2_Value);
+      val02[0]=1;
+      val02[1]=abs(IMU2_Value);
     }
-    customCharacteristic2.setValue(&val01,2);
-    customCharacteristic2.setValue(&val02,2);
+    customCharacteristic2.setValue(val02,2);
     
     
-    delay(5000);
+    delay(500);
     
     lastPrint = millis(); // Update lastPrint time
   }

@@ -274,8 +274,8 @@ void loop()
     {
         if (connected) 
         {
-          String newValue = "Time since boot: " + String(millis()/1000);
-          Serial.println("Setting new characteristic value to \"" + newValue + "\"");
+          //String newValue = "Time since boot: " + String(millis()/1000);
+          //Serial.println("Setting new characteristic value to \"" + newValue + "\"");
           
       
         }else if(doScan)
@@ -452,10 +452,25 @@ void createFileName(int fileNum)
 void logSDCard(int sensorValue) 
 {
   // Set the characteristic's value to be the array of bytes that is actually a string.
-      std::string IMU1x=pRemoteCharacteristic->readValue();
-      std::string IMU2x=pRemoteCharacteristic2->readValue();
-      Serial.println(IMU1x.c_str());
-      Serial.println(IMU2x.c_str());
+      int IMU1, IMU2;
+      std::string IMU1String=pRemoteCharacteristic->readValue();
+      if (int(*IMU1String.c_str())==0)
+        IMU1=int(*(IMU1String.c_str()+1));
+      else
+        IMU1=-1*(uint8_t(*(IMU1String.c_str()+1)));
+      
+      
+       
+      std::string IMU2String = pRemoteCharacteristic2->readValue(); //std::string
+      if (int(*IMU2String.c_str())==0)
+        IMU2=int(*(IMU2String.c_str()+1));
+      else
+        IMU2=-1*(uint8_t(*(IMU2String.c_str()+1)));
+
+     
+
+      Serial.println(IMU1);
+      Serial.println(IMU2);
   DateTime now = rtc.now();
   dataMessage = String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()) +"," + String(double(sensorValue)/100) + "," + "65" + "," + 
                 "150"/*IMU1x.c_str()*/ + "," + "90" + "," + "30" + "," + "150"/*IMU2x.c_str()*/ + "," + "25" + "," + "30" + "\r\n";
