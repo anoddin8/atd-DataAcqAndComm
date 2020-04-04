@@ -46,14 +46,16 @@ void appendFile(fs::FS &fs, const char * path, const char * message); //append f
 // The remote service we wish to connect to.
 static BLEUUID serviceUUID("2c616054-b134-4af3-8828-10cf8b206752");
 // The characteristic of the remote service we are interested in.
-static BLEUUID    charUUID("920eb6a5-4dd5-40e6-bd32-718fa583d8d6");
-static BLEUUID    charUUID2("9d025389-2a3f-47f9-aab8-333ad88e67da");
+static BLEUUID    charUUID_IMU1xyz("920eb6a5-4dd5-40e6-bd32-718fa583d8d6");
+static BLEUUID    charUUID2_IMU2xyz("9d025389-2a3f-47f9-aab8-333ad88e67da");
+static BLEUUID    charUUID3_diffAngle("a0208c9f-9763-409e-aa6c-6975fcc68cff");
 
 static boolean doConnect = false;
 static boolean connected = false;
 static boolean doScan = false;
 static BLERemoteCharacteristic* pRemoteCharacteristic;
 static BLERemoteCharacteristic* pRemoteCharacteristic2;
+static BLERemoteCharacteristic* pRemoteCharacteristic3;
 static BLEAdvertisedDevice* myDevice;
 
 // Save reading number on RTC memory
@@ -85,6 +87,7 @@ const char* password="Rustle100";
 //const char* ssid ="SM-G920W80460";
 //const char* password="prts3279";
 bool connWifi=false;
+bool BluetoothOn=false;
 
 //Pressure Variables
 int16_t pressureSensor;
@@ -156,17 +159,17 @@ void setup() {
 
    Serial.println("Starting Arduino BLE Client application...");
   BLEDevice::init("");
-
-  // Retrieve a Scanner and set the callback we want to use to be informed when we
-  // have detected a new device.  Specify that we want active scanning and start the
-  // scan to run for 5 seconds.
-  BLEScan* pBLEScan = BLEDevice::getScan();
-  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-  pBLEScan->setInterval(1349);
-  pBLEScan->setWindow(449);
-  pBLEScan->setActiveScan(true);
-  pBLEScan->start(5, false);
- // End of setup.
+//
+//  // Retrieve a Scanner and set the callback we want to use to be informed when we
+//  // have detected a new device.  Specify that we want active scanning and start the
+//  // scan to run for 5 seconds.
+//  BLEScan* pBLEScan = BLEDevice::getScan();
+//  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
+//  pBLEScan->setInterval(1349);
+//  pBLEScan->setWindow(449);
+//  pBLEScan->setActiveScan(true);
+//  pBLEScan->start(5, false);
+// // End of setup.
 
   
   // Connect to Wi-Fi network with SSID and password
@@ -234,28 +237,43 @@ void setup() {
 }
 
 void loop() 
-{
+{   
+  if(!doConnect && !BluetoothOn)
+  {
+    BLEScan* pBLEScan = BLEDevice::getScan();
+    pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
+    pBLEScan->setInterval(1349);
+    pBLEScan->setWindow(449);
+    pBLEScan->setActiveScan(true);
+    pBLEScan->start(5, false);
+ // End of setup.
+  }
   //connect to BLE server
   if (doConnect == true) 
   {
+    Serial.println("Connecting to the BLE Server.");
     if (connectToServer()) 
     {
       Serial.println("We are now connected to the BLE Server.");
-    } else {
-      Serial.println("We have failed to connect to the server; there is nothin more we will do.");
+      BluetoothOn=true;
+    } 
+    else if(!BluetoothOn)
+    {
+        Serial.println("We have failed to connect to the server; there is nothin more we will do.");
     }
-    doConnect = false;
+  doConnect = false;
   }
+  
   //check session sensor
   sessionSensor=digitalRead(SESS_SENSE);
-  if (sessionSensor)
+  if (sessionSensor && BluetoothOn)
     {
       delay(500);
       sessionSensor=digitalRead(SESS_SENSE);
     }
     
   // Run when therapy session has started
-  if(sessionSensor)
+  if(sessionSensor && BluetoothOn)
   {
     int fileNum=0;
     bool uniqueFileName=false;
@@ -330,34 +348,42 @@ bool connectToServer()
     }
     Serial.println(" - Found our service");
    // Obtain a reference to the characteristic in the service of the remote BLE server.
-    pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID);
+    pRemoteCharacteristic = pRemoteService->getCharacteristic(charUUID_IMU1xyz);
     if (pRemoteCharacteristic == nullptr) 
     {
       Serial.print("Failed to find our characteristic UUID: ");
-      Serial.println(charUUID.toString().c_str());
+      Serial.println(charUUID_IMU1xyz.toString().c_str());
       pClient->disconnect();
       return false;
     }
-    pRemoteCharacteristic2 = pRemoteService->getCharacteristic(charUUID2);
-    if (pRemoteCharacteristic == nullptr) 
+    pRemoteCharacteristic2 = pRemoteService->getCharacteristic(charUUID2_IMU2xyz);
+    if (pRemoteCharacteristic2 == nullptr) 
     {
       Serial.print("Failed to find our characteristic UUID: ");
-      Serial.println(charUUID.toString().c_str());
+      Serial.println(charUUID2_IMU2xyz.toString().c_str());
       pClient->disconnect();
       return false;
     }
-    Serial.println(" - Found our characteristic");
+    pRemoteCharacteristic3 = pRemoteService->getCharacteristic(charUUID3_diffAngle);
+    if (pRemoteCharacteristic3 == nullptr) 
+    {
+      Serial.print("Failed to find our characteristic UUID: ");
+      Serial.println(charUUID3_diffAngle.toString().c_str());
+      pClient->disconnect();
+      return false;
+    }
+    Serial.println(" - Found all characteristics");
 
     // Read the value of the characteristic.
-    if(pRemoteCharacteristic->canRead()) 
-    {
-      std::string value = pRemoteCharacteristic->readValue();
-      Serial.print("The characteristic value was: ");
-      Serial.println(value.c_str());
-    }
+//    if(pRemoteCharacteristic3->canRead()) 
+//    {
+//      std::string value = pRemoteCharacteristic3->readValue();
+//      Serial.print("The characteristic value was: ");
+//      Serial.println(value.c_str());
+//    }
 
-    if(pRemoteCharacteristic->canNotify())
-      pRemoteCharacteristic->registerForNotify(notifyCallback);
+    if(pRemoteCharacteristic3->canNotify())
+      pRemoteCharacteristic3->registerForNotify(notifyCallback);
 
     connected = true;
     return connected;
@@ -401,19 +427,8 @@ void getTimeStamp()
   Imn=(uint8_t)timeClient.getMinutes();
   Isc=(uint8_t)timeClient.getSeconds();
   rtc.adjust(DateTime(Iyr, Imth, Idy, Ihr, Imn, Isc));
-  Serial.print(Iyr);
-  Serial.print('/');
-  Serial.print(Imth);
-  Serial.print('/');
-  Serial.println(Idy);
-
-  Serial.print(Ihr);
-  Serial.print(':');
-  Serial.print(Imn);
-  Serial.print(':');
-  Serial.print(Isc);
 }
-//Print Dare and time
+//Print Date and time
 void printDateTime()
 {
     DateTime now = rtc.now();
@@ -467,29 +482,43 @@ void createFileName(int fileNum)
 void logSDCard(int sensorValue) 
 {
   // Set the characteristic's value to be the array of bytes that is actually a string.
-      int IMU1, IMU2;
+      int IMU1x, IMU2x, IMU1y, IMU2y, IMU1z, IMU2z, diffAngle;
       std::string IMU1String=pRemoteCharacteristic->readValue();
       if (int(*IMU1String.c_str())==0)
-        IMU1=int(*(IMU1String.c_str()+1));
+        IMU1x=int(*(IMU1String.c_str()+1));
       else
-        IMU1=-1*(uint8_t(*(IMU1String.c_str()+1)));
-      
-      
-       
+        IMU1x=-1*(uint8_t(*(IMU1String.c_str()+1)));
+      if (int(*IMU1String.c_str()+2)==0)
+        IMU1y=int(*(IMU1String.c_str()+3));
+      else
+        IMU1y=-1*(uint8_t(*(IMU1String.c_str()+3)));
+      if (int(*IMU1String.c_str()+4)==0)
+        IMU1z=int(*(IMU1String.c_str()+5));
+      else
+        IMU1z=-1*(uint8_t(*(IMU1String.c_str()+5)));
+           
       std::string IMU2String = pRemoteCharacteristic2->readValue(); //std::string
       if (int(*IMU2String.c_str())==0)
-        IMU2=int(*(IMU2String.c_str()+1));
+        IMU2x=int(*(IMU2String.c_str()+1));
       else
-        IMU2=-1*(uint8_t(*(IMU2String.c_str()+1)));
+        IMU2x=-1*(uint8_t(*(IMU2String.c_str()+1)));
+      if (int(*IMU2String.c_str()+2)==0)
+        IMU2y=int(*(IMU2String.c_str()+3));
+      else
+        IMU2y=-1*(uint8_t(*(IMU2String.c_str()+3)));
+      if (int(*IMU2String.c_str()+4)==0)
+        IMU2z=int(*(IMU2String.c_str()+5));
+      else
+        IMU2z=-1*(uint8_t(*(IMU2String.c_str()+5)));
 
-     
+      std::string IMU3String = pRemoteCharacteristic3->readValue(); //std::string
+      diffAngle=int(*IMU3String.c_str());
+      Serial.println(diffAngle); 
 
-      Serial.println(IMU1);
-      Serial.println(IMU2);
   DateTime now = rtc.now();
-  dataMessage = String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()) +"," + String(double(sensorValue)/100) + "," + String(IMU2) + "," + 
-                "150"/*IMU1x.c_str()*/ + "," + "90" + "," + "30" + "," + "150"/*IMU2x.c_str()*/ + "," + "25" + "," + "30" + "\r\n";
-
+  dataMessage = String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()) +"," + String(double(sensorValue)/100) + "," + String(diffAngle) + "," + 
+                String(IMU1x) + "," + String(IMU1y) + "," + String(IMU1z) + "," + String(IMU2x) + "," + String(IMU2y) + "," + String(IMU2z) + "\r\n";
+  Serial.println(dataMessage);
   appendFile(SD, FileName, dataMessage.c_str());
 }
 
