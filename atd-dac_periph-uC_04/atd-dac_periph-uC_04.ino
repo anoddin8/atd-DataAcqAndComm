@@ -38,14 +38,13 @@ LSM9DS1 imu2;
 #define B_LED 26
 
 #define PRINT_CALCULATED
-#define PRINT_SPEED 10 // 250 ms between prints
+#define PRINT_SPEED 1000 // 250 ms between prints
 static unsigned long lastPrint = 0; // Keep track of print time
 
 // Earth's magnetic field varies by location. Add or subtract 
-// a declination to get a more accurate heading. Calculate 
-// your's here:
+// a declination to get a more accurate heading. 
 // http://www.ngdc.noaa.gov/geomag-web/#declination
-#define DECLINATION -10.17 // Declination (degrees) in Boulder, CO. is -8.58 
+#define DECLINATION -10.17 // Declination (degrees) in Toronto,ON is -10.17 
 
 BLECharacteristic customCharacteristic1(
   BLEUUID(CHARACTERISTIC_UUID), 
@@ -76,12 +75,12 @@ class ServerCallbacks: public BLEServerCallbacks {
 struct HEADING
 {
     double x,y,z;
+    unsigned char xyz[6];
 };
 
 //Function definitions
-void printGyro();  
-void printAccel(); 
-void printMag();   
+void updateIMUs ();
+unsigned char convXYZtoCharArray(HEADING IMU_YPR);
 HEADING YPR(float ax, float ay, float az, float mx, float my, float mz);
 HEADING YPR_vector(float ax, float ay, float az, float mx, float my, float mz);
 
@@ -175,51 +174,10 @@ void loop()
   
   HEADING IMU1_YPR,IMU2_YPR,IMU1_VEC,IMU2_VEC;
   double diffAngle;
+  
   // Update the sensor values whenever new data is available
-  if ( imu1.gyroAvailable() )
-  {
-    // To read from the gyroscope,  first call the
-    // readGyro() function. When it exits, it'll update the
-    // gx, gy, and gz variables with the most current data.
-    imu1.readGyro();
-  }
-  if ( imu1.accelAvailable() )
-  {
-    // To read from the accelerometer, first call the
-    // readAccel() function. When it exits, it'll update the
-    // ax, ay, and az variables with the most current data.
-    imu1.readAccel();
-  }
-  if ( imu1.magAvailable() )
-  {
-    // To read from the magnetometer, first call the
-    // readMag() function. When it exits, it'll update the
-    // mx, my, and mz variables with the most current data.
-    imu1.readMag();
-  }
-  //************
-   // Update the sensor values whenever new data is available
-  if ( imu2.gyroAvailable() )
-  {
-    // To read from the gyroscope,  first call the
-    // readGyro() function. When it exits, it'll update the
-    // gx, gy, and gz variables with the most current data.
-    imu2.readGyro();
-  }
-  if ( imu2.accelAvailable() )
-  {
-    // To read from the accelerometer, first call the
-    // readAccel() function. When it exits, it'll update the
-    // ax, ay, and az variables with the most current data.
-    imu2.readAccel();
-  }
-  if ( imu2.magAvailable() )
-  {
-    // To read from the magnetometer, first call the
-    // readMag() function. When it exits, it'll update the
-    // mx, my, and mz variables with the most current data.
-    imu2.readMag();
-  }
+  void updateIMUs ();
+
   if ((lastPrint + PRINT_SPEED) < millis())
   {
     unsigned char xyz1[6];
@@ -270,36 +228,9 @@ void loop()
     IMU2_YPR=YPR(imu2.ax, imu2.ay, imu2.az, -imu2.my, -imu2.mx, imu2.mz);
     IMU2_VEC=YPR_vector(imu2.ax, imu2.ay, imu2.az, -imu2.my, -imu2.mx, imu2.mz);
     
-    if(IMU2_YPR.x>=0)
-    {
-      xyz2[0]=0;//Positive Value
-      xyz2[1]=IMU2_YPR.x;
-    }
-    else
-    {
-      xyz2[0]=1;//negative Value
-      xyz2[1]=abs(IMU2_YPR.x);
-    }
-    if(IMU2_YPR.y>=0)
-    {
-      xyz2[2]=0;//Positive Value
-      xyz2[3]=IMU2_YPR.y;
-    }
-    else
-    {
-      xyz2[2]=1;//negative Value
-      xyz2[3]=abs(IMU2_YPR.y);
-    }
-    if(IMU2_YPR.z>=0)
-    {
-      xyz2[4]=0;//Positive Value
-      xyz2[5]=IMU2_YPR.z;
-    }
-    else
-    {
-      xyz2[4]=1;//negative Value
-      xyz2[5]=abs(IMU2_YPR.y);
-    }
+    
+    //xyz2=convXYZtoCharArray(IMU2_YPR);
+    xyz2=convXYZtoCharArray(IMU2_YPR);
     customCharacteristic2.setValue(xyz2,6);
 
     
@@ -316,14 +247,67 @@ void loop()
     delay(50);
     digitalWrite(B_LED, LOW);
     digitalWrite(G_LED, HIGH);
-    delay(950);
-    
-    //delay(1000);
+
     
     lastPrint = millis(); // Update lastPrint time
   }
 }
+ void updateIMUs ()
+ {
+  // Update the sensor values whenever new data is available
 
+  if ( imu1.accelAvailable() )
+  {
+    imu1.readAccel();
+  }
+  if ( imu1.magAvailable() )
+  {
+    imu1.readMag();
+  }
+  if ( imu2.accelAvailable() )
+  {
+    imu2.readAccel();
+  }
+  if ( imu2.magAvailable() )
+  {
+    imu2.readMag();
+  }
+}
+unsigned char convXYZtoCharArray(HEADING IMU_YPR)
+{ 
+  unsigned char xyz[6];
+  if(IMU_YPR.x>=0)
+    {
+      IMU_YPR.xyz[0]=0;//Positive Value
+      IMU_YPR.xyz[1]=IMU_YPR.x;
+    }
+    else
+    {
+      IMU_YPR.xyz[0]=1;//negative Value
+      IMU_YPR.xyz[1]=abs(IMU_YPR.x);
+    }
+    if(IMU_YPR.y>=0)
+    {
+      IMU_YPR.xyz[2]=0;//Positive Value
+      IMU_YPR.xyz[3]=IMU_YPR.y;
+    }
+    else
+    {
+      IMU_YPR.xyz[2]=1;//negative Value
+      IMU_YPR.xyz[3]=abs(IMU_YPR.y);
+    }
+    if(IMU_YPR.z>=0)
+    {
+      IMU_YPR.xyz[4]=0;//Positive Value
+      IMU_YPR.xyz[5]=IMU_YPR.z;
+    }
+    else
+    {
+      IMU_YPR.xyz[4]=1;//negative Value
+      IMU_YPR.xyz[5]=abs(IMU_YPR.y);
+    }
+    return xyz;
+}
 HEADING YPR(float ax, float ay, float az, float mx, float my, float mz)
 {
   float roll = atan2(ay, az);
@@ -371,20 +355,14 @@ HEADING YPR_vector(float ax, float ay, float az, float mx, float my, float mz)
   yaw -= DECLINATION * PI / 180;
   
   if (yaw > PI) yaw -= (2 * PI);
-  else if (yaw < -PI) yaw += (2 * PI);
+  else if (yaw < -PI) yaw += (2 * PI);  
   
-  // Convert everything from radians to degrees:
- // yaw *= 180.0 / PI;
- // pitch *= 180.0 / PI;
-  //roll  *= 180.0 / PI;
-  
-  
-  Serial.print(pitch, 3);
-  Serial.print(", ");
-  Serial.print(roll, 3);
-  Serial.print(", ");
-  Serial.print(yaw, 3);
-  Serial.print(", ");
+//  Serial.print(pitch, 3);
+//  Serial.print(", ");
+//  Serial.print(roll, 3);
+//  Serial.print(", ");
+//  Serial.print(yaw, 3);
+//  Serial.print(", ");
 
 
   HEADING VectorHeading = { cos(yaw)*cos(roll), sin(yaw)*cos(roll), sin(roll) };
