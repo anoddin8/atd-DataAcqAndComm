@@ -168,13 +168,13 @@ void loop()
       digitalWrite(B_LED, LOW);
       delay(250);
   
-    pService->start();
-    BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-    pAdvertising->addServiceUUID(SERVICE_UUID);
-    pAdvertising->setScanResponse(true);
-    pAdvertising->setMinPreferred(0x06);  // functions that help with iPhone connections issue
-    pAdvertising->setMinPreferred(0x12);
-    BLEDevice::startAdvertising();
+      pService->start();
+      BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+      pAdvertising->addServiceUUID(SERVICE_UUID);
+      pAdvertising->setScanResponse(true);
+      pAdvertising->setMinPreferred(0x06);  // functions that help with iPhone connections issue
+      pAdvertising->setMinPreferred(0x12);
+      BLEDevice::startAdvertising();
     
  }
  void startIMUs()
@@ -190,10 +190,7 @@ void loop()
   {
     Serial.println("Failed to communicate with IMU1.");
     Serial.println("Double-check wiring.");
-    Serial.println("Default settings in this sketch will " \
-                  "work for an out of the box LSM9DS1 " \
-                  "Breakout, but may need to be modified " \
-                  "if the board jumpers are.");
+
     digitalWrite(R_LED, HIGH);
     delay(250);
     while (1)
@@ -210,10 +207,7 @@ void loop()
     digitalWrite(R_LED, HIGH);
     Serial.println("Failed to communicate with IMU2.");
     Serial.println("Double-check wiring.");
-    Serial.println("Default settings in this sketch will " \
-                  "work for an out of the box LSM9DS1 " \
-                  "Breakout, but may need to be modified " \
-                  "if the board jumpers are.");
+
     while (1)
       ;
   }

@@ -257,7 +257,7 @@ void loop()
       File file = SD.open(FileName);
       if(!file) {
         Serial.println("Creating file...");
-        writeFile(SD, FileName, "Time, Pressure, Diff Angle, IMU1_X, IMU1_Y, IMU1_Z, IMU2_X, IMU2_Y, IMU2_Z  \r\n");
+        writeFile(SD, FileName, "Time, Pressure, Differential Angle, IMU1_Yaw, IMU1_Pitch, IMU1_Roll, IMU2_Yaw, IMU2_Pitch, IMU2_Roll  \r\n");
         uniqueFileName=true;
       }
       else {
