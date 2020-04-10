@@ -68,7 +68,7 @@ NTPClient timeClient(ntpUDP);
 // Define CS pin for the SD card module
 #define SD_CS 5
 
-#define PRINT_SPEED 2000 // time between polling
+#define PRINT_SPEED 1000 // time between polling
 static unsigned long lastPrint = 0; // Keep track of polling time
 
 // Variables for SDcard File name and Days fo the week
@@ -468,7 +468,8 @@ void createFileName(int fileNum)
 void logSDCard(int sensorValue) 
 {
   // Set the characteristic's value to be the array of bytes that is actually a string.
-      int IMU1x, IMU2x, IMU1y, IMU2y, IMU1z, IMU2z, diffAngle;
+      int IMU1x, IMU2x, IMU1y, IMU2y, IMU1z, IMU2z;
+      double diffAngle;
       std::string IMU1String=pRemoteCharacteristic->readValue();
       if (int(*IMU1String.c_str())==0)
         IMU1x=int(*(IMU1String.c_str()+1));
@@ -498,7 +499,7 @@ void logSDCard(int sensorValue)
         IMU2z=-1*(uint8_t(*(IMU2String.c_str()+5)));
 
       std::string IMU3String = pRemoteCharacteristic3->readValue(); //std::string
-      diffAngle=int(*IMU3String.c_str());
+      diffAngle=(((int(*IMU3String.c_str()))*256)+(int(*IMU3String.c_str()+1)))/100.0;
       Serial.println(diffAngle); 
 
   DateTime now = rtc.now();

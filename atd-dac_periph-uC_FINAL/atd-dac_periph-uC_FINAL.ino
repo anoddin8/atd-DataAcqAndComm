@@ -88,7 +88,7 @@ void startIMUs();
 void updateIMUs();
 IMU_OBJECT YPR_DegVec(float ax, float ay, float az, float mx, float my, float mz);
 IMU_OBJECT convXYZtoCharArray(IMU_OBJECT IMU_YPR);
-unsigned char diffAngle(IMU_OBJECT IMU1,IMU_OBJECT IMU2);
+int diffAngle(IMU_OBJECT IMU1,IMU_OBJECT IMU2);
 
 void setup() 
 {
@@ -108,7 +108,8 @@ void setup()
 
 void loop()
 {
-  unsigned char diffA[1];
+  unsigned char diffA[2];
+  int diffA_int;
   IMU_OBJECT IMU1_VecDeg,IMU2_VecDeg;
   
   // Update the sensor values whenever new data is available
@@ -134,8 +135,13 @@ void loop()
     customCharacteristic2.setValue(IMU2_VecDeg.yprD,6);
 
     //Find Differential Angle between the 2 IMUs
-    diffA[0]=diffAngle(IMU1_VecDeg,IMU2_VecDeg);
-    differentialAngle.setValue(diffA,1);
+    diffA_int=diffAngle(IMU1_VecDeg,IMU2_VecDeg);
+    Serial.println(diffA_int);
+    diffA[0]=char(diffA_int/256);
+    diffA[1]=char(diffA_int%256);
+    Serial.println(diffA[0]);
+    Serial.println(diffA[1]);
+    differentialAngle.setValue(diffA,2);
 
     //Signals Bluetooth sent
     digitalWrite(G_LED, LOW);
@@ -315,16 +321,16 @@ IMU_OBJECT convXYZtoCharArray(IMU_OBJECT IMU_YPR)
   return IMU_YPR;
 }
 //load yaw, pitch, roll into bluetooth characteristic
-unsigned char diffAngle(IMU_OBJECT IMU1,IMU_OBJECT IMU2)
+int diffAngle(IMU_OBJECT IMU1,IMU_OBJECT IMU2)
 {
-    unsigned char diffA;
+
     double diffAng;
     diffAng = (IMU1.xV*IMU2.xV) + (IMU1.yV*IMU2.yV) + (IMU1.zV*IMU2.zV);
     diffAng /= sqrt(pow(IMU1.xV,2)+pow(IMU1.yV,2)+pow(IMU1.zV,2));
     diffAng /= sqrt(pow(IMU2.xV,2)+pow(IMU2.yV,2)+pow(IMU2.zV,2));
     diffAng = acos(diffAng);
-    diffAng = 180-(diffAng*180/M_PI);
+    diffAng = (180-(diffAng*180/M_PI))*100;
     Serial.println(diffAng);
-    return diffA = char(diffAng);
+    return int(diffAng);
     
 }
