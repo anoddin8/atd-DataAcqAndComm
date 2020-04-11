@@ -39,7 +39,7 @@ LSM9DS1 imu2;
 #define B_LED 26
 
 //#define PRINT_CALCULATED
-#define PRINT_SPEED 1000 // time between polling
+#define PRINT_SPEED 200 // time between polling
 static unsigned long lastPrint = 0; // Keep track of polling time
 
 // Earth's magnetic field varies by location. Toronto magnetic field found here:
@@ -329,7 +329,7 @@ int diffAngle(IMU_OBJECT IMU1,IMU_OBJECT IMU2)
     diffAng /= sqrt(pow(IMU1.xV,2)+pow(IMU1.yV,2)+pow(IMU1.zV,2));
     diffAng /= sqrt(pow(IMU2.xV,2)+pow(IMU2.yV,2)+pow(IMU2.zV,2));
     diffAng = acos(diffAng);
-    diffAng = (180-(diffAng*180/M_PI))*100;
+    diffAng = (diffAng*180/M_PI)*100;
     Serial.println(diffAng);
     return int(diffAng);
     

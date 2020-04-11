@@ -21,7 +21,7 @@ bool connectToServer(); //Connect to BLE
 void getTimeStamp(); //RTC module Get Time and Date
 void printDateTime();//Print Date And time
 void createFileName(int fileNum); //Create unique filename
-void logSDCard(int sensorValue); //log values to sd card
+void logSDCard(int sensorValue, int sessionMillis); //log values to sd card
 void writeFile(fs::FS &fs, const char * path, const char * message) ; //write file
 void appendFile(fs::FS &fs, const char * path, const char * message); //append file
 
@@ -212,6 +212,8 @@ void setup() {
 
 void loop() 
 {  
+  int sessionMillis;
+  int lastMillis;
   //Scan for BLE until proper device is found 
   if(!doConnect && !BluetoothOn)
   {
@@ -249,6 +251,10 @@ void loop()
   {
     int fileNum=0;
     bool uniqueFileName=false;
+    sessionMillis=0;
+    lastMillis=millis();
+   
+   
 
     //Create unique file name, and set header line on .csv file
     while(!uniqueFileName)
@@ -257,7 +263,7 @@ void loop()
       File file = SD.open(FileName);
       if(!file) {
         Serial.println("Creating file...");
-        writeFile(SD, FileName, "Time, Pressure, Differential Angle, IMU1_Yaw, IMU1_Pitch, IMU1_Roll, IMU2_Yaw, IMU2_Pitch, IMU2_Roll  \r\n");
+        writeFile(SD, FileName, "Time, Seconds, Pressure, Differential Angle, IMU1_Yaw, IMU1_Pitch, IMU1_Roll, IMU2_Yaw, IMU2_Pitch, IMU2_Roll  \r\n");
         uniqueFileName=true;
       }
       else {
@@ -269,6 +275,9 @@ void loop()
     //When session sesnor is on log all data
     while(sessionSensor)
     {
+      sessionMillis += millis()-lastMillis;
+      lastMillis=millis();
+      
       if((lastPrint + PRINT_SPEED) < millis())
       {
         // Insures session is still connected to BLE
@@ -277,15 +286,16 @@ void loop()
           BLEDevice::getScan()->start(0);  
         }
         //Convert pressure sensor voltage to PSI
-        pressureSensor = map(analogRead(PRESS_SENSE), 390, 3962, 0, 1200);
+        pressureSensor = map(analogRead(PRESS_SENSE), 390, 4095, 0, 1200);
         if (pressureSensor < 0)
           {
             pressureSensor = 0;
           }
         Serial.println(double(pressureSensor)/100);
+
         
         //LogSDcard with Pressure data and extracted Bluetooth data
-        logSDCard(pressureSensor);
+        logSDCard(pressureSensor,sessionMillis);
         sessionSensor=digitalRead(SESS_SENSE);
         
         if (!sessionSensor)
@@ -465,7 +475,7 @@ void createFileName(int fileNum)
 }
 
 // Write all sensor readings on the SD card
-void logSDCard(int sensorValue) 
+void logSDCard(int sensorValue, int sessionMillis) 
 {
   // Set the characteristic's value to be the array of bytes that is actually a string.
       int IMU1x, IMU2x, IMU1y, IMU2y, IMU1z, IMU2z;
@@ -484,7 +494,7 @@ void logSDCard(int sensorValue)
       else
         IMU1z=-1*(uint8_t(*(IMU1String.c_str()+5)));
            
-      std::string IMU2String = pRemoteCharacteristic2->readValue(); //std::string
+      std::string IMU2String = pRemoteCharacteristic2->readValue();
       if (int(*IMU2String.c_str())==0)
         IMU2x=int(*(IMU2String.c_str()+1));
       else
@@ -498,14 +508,15 @@ void logSDCard(int sensorValue)
       else
         IMU2z=-1*(uint8_t(*(IMU2String.c_str()+5)));
 
-      std::string IMU3String = pRemoteCharacteristic3->readValue(); //std::string
-      diffAngle=(((int(*IMU3String.c_str()))*256)+(int(*IMU3String.c_str()+1)))/100.0;
+      std::string IMU3String = pRemoteCharacteristic3->readValue(); 
+
+      diffAngle=(((int(*IMU3String.c_str()))*256)+(int(*(IMU3String.c_str()+1))))/100.0;
       Serial.println(diffAngle); 
 
   DateTime now = rtc.now();
-  dataMessage = String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()) +"," + String(double(sensorValue)/100) + "," + String(diffAngle) + "," + 
+  dataMessage = String(now.hour()) + ":" + String(now.minute()) + ":" + String(now.second()) +"," + String (round(sessionMillis/1000)) +"," + String(double(sensorValue)/100) + "," + String(diffAngle) + "," + 
                 String(IMU1x) + "," + String(IMU1y) + "," + String(IMU1z) + "," + String(IMU2x) + "," + String(IMU2y) + "," + String(IMU2z) + "\r\n";
-  Serial.println(dataMessage);
+
   appendFile(SD, FileName, dataMessage.c_str());
 }
 
